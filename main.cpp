@@ -219,9 +219,9 @@ LRESULT WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
-    Input* input_ = nullptr;
-
-
+    Input* input = nullptr;
+   
+    
 #pragma region WindowsAPI初期化処理
     // ウィンドウサイズ
     const int window_width = 1280;  // 横幅
@@ -473,8 +473,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     // DirectX初期化処理　ここまで
 #pragma endregion
 
-    input_ = new Input();
-    input_->Initialize();
+   input = new Input();
+   input->Initialize(w.hInstance,hwnd);
   
 
 #pragma region 描画初期化処理
@@ -1116,7 +1116,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
     }
 
-    delete input_;
+    delete input;
 
     // ウィンドウクラスを登録解除
     UnregisterClass(w.lpszClassName, w.hInstance);
