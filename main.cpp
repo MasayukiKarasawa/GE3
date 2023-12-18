@@ -7,19 +7,14 @@
 #include <DirectXMath.h>
 #include <DirectXTex.h>
 #include <d3dcompiler.h>
-#define DIRECTINPUT_VERSION     0x0800   // DirectInputのバージョン指定
-#include <dinput.h>
 #include <wrl.h>
 
-#include"Input.h"
-
-
+#include"input.h"
 
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
-#pragma comment(lib, "dinput8.lib")
-#pragma comment(lib, "dxguid.lib")
+
 
 using namespace DirectX;
 using namespace Microsoft::WRL;
@@ -219,9 +214,9 @@ LRESULT WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
-    Input* input = nullptr;
-   
-    
+    //ポインタ変数
+    input* input_ = nullptr;
+
 #pragma region WindowsAPI初期化処理
     // ウィンドウサイズ
     const int window_width = 1280;  // 横幅
@@ -260,6 +255,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
     MSG msg{};  // メッセージ
 #pragma endregion
+
+#pragma region DirectX初期化処理
     // DirectX初期化処理　ここから
     HRESULT result;
     ComPtr<ID3D12Device> device;
@@ -473,9 +470,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     // DirectX初期化処理　ここまで
 #pragma endregion
 
-   input = new Input();
-   input->Initialize(w.hInstance,hwnd);
-  
+    //input生成、初期化
+    input_ = new input();
+    input_->Initalize(w.hInstance,hwnd);
 
 #pragma region 描画初期化処理
 
@@ -946,7 +943,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     device->CreateShaderResourceView(texBuff2.Get(), &srvDesc, srvHandle);
 
     size_t textureIndex = 0;
-    BYTE key[256] = {};
+    
 
     // ゲームループ
     while (true) {
@@ -961,16 +958,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             break;
         }
 
-        // キーボード情報の取得開始
-        keyboard->Acquire();
-        // 全キーの入力状態を取得する
-        keyboard->GetDeviceState(sizeof(key), key);
+        input_->Updete();
 
-        //// 数字の0キーが押されていたら
-        //if (key[DIK_0]) 
-        //{
-        //    OutputDebugStringA("Hit 0\n");  // 出力ウィンドウに「Hit 0」と表示
-        //}
+        // 数字の0キーが押されていたら
+        if (input_->PushKey(DIK_0))
+        {
+            OutputDebugStringA("Hit 0\n");  // 出力ウィンドウに「Hit 0」と表示
+        }
 
         // DirectX毎フレーム処理　ここから
         //static float red = 1.0f;
@@ -981,26 +975,29 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         //    constMapMaterial->color = XMFLOAT4(red, 1.0f - red, 0, 0.5f);              // RGBAで半透明の赤
         //}
 
-        if (key[DIK_D] || key[DIK_A])
-        {
-            if (key[DIK_D]) { angle += XMConvertToRadians(1.0f); }
-            else if (key[DIK_A]) { angle -= XMConvertToRadians(1.0f); }
+        //if (key[DIK_D] || key[DIK_A])
+        //{
+        //    if (key[DIK_D]) { angle += XMConvertToRadians(1.0f); }
+        //    else if (key[DIK_A]) { angle -= XMConvertToRadians(1.0f); }
 
-            // angleラジアンだけY軸まわりに回転。半径は-100
-            eye.x = -100 * sinf(angle);
-            eye.z = -100 * cosf(angle);
+        //    // angleラジアンだけY軸まわりに回転。半径は-100
+        //    eye.x = -100 * sinf(angle);
+        //    eye.z = -100 * cosf(angle);
 
-            matView = XMMatrixLookAtLH(XMLoadFloat3(&eye), XMLoadFloat3(&target), XMLoadFloat3(&up));
-        }
+        //    matView = XMMatrixLookAtLH(XMLoadFloat3(&eye), XMLoadFloat3(&target), XMLoadFloat3(&up));
+        //}
 
         // 座標操作
-        if (key[DIK_UP] || key[DIK_DOWN] || key[DIK_RIGHT] || key[DIK_LEFT])
+        if (input_->PushKey(DIK_UP) || input_->PushKey(DIK_DOWN)
+            || input_->PushKey(DIK_RIGHT) || input_->PushKey(DIK_LEFT))
         {
-            if (key[DIK_UP]) { object3ds[0].position.y += 1.0f; }
-            else if (key[DIK_DOWN]) { object3ds[0].position.y -= 1.0f; }
-            if (key[DIK_RIGHT]) { object3ds[0].position.x += 1.0f; }
-            else if (key[DIK_LEFT]) { object3ds[0].position.x -= 1.0f; }
+            if (input_->PushKey(DIK_UP)) { object3ds[0].position.y += 1.0f; }
+            else if (input_->PushKey(DIK_DOWN)) { object3ds[0].position.y -= 1.0f; }
+
+            if (input_->PushKey(DIK_RIGHT)) { object3ds[0].position.x += 1.0f; }
+            else if (input_->PushKey(DIK_LEFT)) { object3ds[0].position.x -= 1.0f; }
         }
+    
 
         // 全オブジェクトについて処理
         for (size_t i = 0; i < _countof(object3ds); i++)
@@ -1116,7 +1113,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
     }
 
-    delete input;
+    delete  input_;
 
     // ウィンドウクラスを登録解除
     UnregisterClass(w.lpszClassName, w.hInstance);
