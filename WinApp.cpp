@@ -1,9 +1,15 @@
 ﻿#include "WinApp.h"
+#include"External/imgui/imgui.h"
 
-#pragma comment(lib,"winmm.lib")
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-LRESULT WinApp::WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
-{
+// ウィンドウプロシージャ
+LRESULT WinApp::WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
+
+    if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam)) {
+        return true;
+    }
+
     // メッセージ応じてゲーム固有の処理を行う
     switch (msg) {
         // ウィンドウが破棄された
@@ -16,11 +22,12 @@ LRESULT WinApp::WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
     // 標準のメッセージ処理を行う
     return DefWindowProc(hwnd, msg, wparam, lparam);
 }
-
 void WinApp::Initialize()
 {
 
-    // ウィンドウクラスの設定 
+    CoInitializeEx(0, COINIT_MULTITHREADED);
+
+    // ウィンドウクラスの設定
     w.cbSize = sizeof(WNDCLASSEX);
     w.lpfnWndProc = (WNDPROC)WindowProc; // ウィンドウプロシージャを設定
     w.lpszClassName = L"DirectXGame"; // ウィンドウクラス名
@@ -50,12 +57,11 @@ void WinApp::Initialize()
     // ウィンドウを表示状態にする
     ShowWindow(hwnd, SW_SHOW);
 
-    //システムタイマーの分解能力を上げる
-    timeBeginPeriod(1);
 }
 
 bool WinApp::Update()
 {
+    MSG msg{};
     // メッセージがある？
     if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
         TranslateMessage(&msg); // キー入力メッセージの処理
@@ -64,14 +70,18 @@ bool WinApp::Update()
 
     // ✖ボタンで終了メッセージが来たらゲームループを抜ける
     if (msg.message == WM_QUIT) {
-        return true;//break;
+        return true;
     }
 
     return false;
 }
 
+
 void WinApp::Finalize()
 {
+    CoUninitialize();
+
     // ウィンドウクラスを登録解除
     UnregisterClass(w.lpszClassName, w.hInstance);
 }
+

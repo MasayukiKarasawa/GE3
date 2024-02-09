@@ -1,34 +1,31 @@
-#include "input.h"
-
+#include "Input.h"
 #include<cassert>
-
-
 using namespace Microsoft::WRL;
 
-void input::Initalize(WinApp* winApp)
+
+void Input::Initialize(WinApp* winApp)
 {
     winApp_ = winApp;
 
     HRESULT result;
-
     // DirectInputの初期化
-    ComPtr<IDirectInput8> directInput;
     result = DirectInput8Create(
         winApp_->GetHInstance(), DIRECTINPUT_VERSION, IID_IDirectInput8, (void**)&directInput, nullptr);
     assert(SUCCEEDED(result));
 
     // キーボードデバイスの生成
+
     result = directInput->CreateDevice(GUID_SysKeyboard, &keyboard, NULL);
     // 入力データ形式のセット
     result = keyboard->SetDataFormat(&c_dfDIKeyboard); // 標準形式
     assert(SUCCEEDED(result));
     // 排他制御レベルのセット
     result = keyboard->SetCooperativeLevel(
-        winApp->GetHwnd(), DISCL_FOREGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY);
+        winApp_->GetHwnd(), DISCL_FOREGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY);
     assert(SUCCEEDED(result));
 }
 
-void input::Updete()
+void Input::Update()
 {
     //keyPreの中にkeyの情報をコピーする
     memcpy(keyPre, key, sizeof(key));
@@ -37,23 +34,24 @@ void input::Updete()
     keyboard->Acquire();
     // 全キーの入力状態を取得する
     keyboard->GetDeviceState(sizeof(key), key);
-
 }
 
-bool input::PushKey(BYTE keyNumber)
+bool Input::PushKey(BYTE keyNumber)
 {
-    //指定キーを押していればをtrue返す
+    //任意のボタンが押されているか
     if (key[keyNumber]) {
         return true;
     }
-    //そうでなければfalseを返す
+    //任意のボタンが押されていなかったとき
     return false;
 }
 
-bool input::TriggerKey(BYTE keyNumber)
+bool Input::TriggerKey(BYTE keyNumber)
 {
+    //任意のボタンが押されているか
     if (key[keyNumber] && keyPre[keyNumber] == 0) {
         return true;
     }
+    //任意のボタンが押されていなかったとき
     return false;
 }

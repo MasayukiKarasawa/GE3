@@ -5,13 +5,14 @@
 
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
+
 using namespace Microsoft::WRL;
+
+const uint32_t DirectXCommon::kMaxSRVCount = 512;
 
 void DirectXCommon::Initialize(WinApp* winApp)
 {
     this->winApp = winApp;
-
-    InitializeFixFPS();
 
     DeviceInitialize();
     CommandInitialize();
@@ -19,9 +20,13 @@ void DirectXCommon::Initialize(WinApp* winApp)
     RenderTargetInitialize();
     DepthBufferInitialize();
     FenceInitialize();
+
+    rtvDesctiptorHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 2, false);
+    srvDescriptorHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kMaxSRVCount, true);
+
 }
 
-void DirectXCommon::ProDraw()
+void DirectXCommon::PreDraw()
 {
     // バックバッファの番号を取得（2つなので0番か1番）
     UINT bbIndex = swapChain->GetCurrentBackBufferIndex();
@@ -44,6 +49,10 @@ void DirectXCommon::ProDraw()
     FLOAT clearColor[] = { 0.1f,0.25f, 0.5f,0.0f }; // 青っぽい色
     commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
     commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+    ID3D12DescriptorHeap* descriptorHeaps[] = { srvDescriptorHeap.Get() };
+    commandList->SetDescriptorHeaps(1, descriptorHeaps);
+
 
     // ４．描画コマンドここから
     // ビューポート設定コマンド
@@ -96,8 +105,6 @@ void DirectXCommon::PostDraw()
         CloseHandle(event);
     }
 
-    //FPS固定処理
-    UpdateFixFPS();
 
     // キューをクリア
     result = commandAllocator->Reset();
@@ -107,10 +114,11 @@ void DirectXCommon::PostDraw()
     assert(SUCCEEDED(result));
 }
 
+
 void DirectXCommon::DeviceInitialize()
 {
+    HRESULT result{};
 
-    HRESULT result;
 #ifdef _DEBUG
     //デバッグレイヤーをオンに
     ComPtr<ID3D12Debug1> debugController;
@@ -202,6 +210,7 @@ void DirectXCommon::DeviceInitialize()
 void DirectXCommon::CommandInitialize()
 {
     HRESULT result{};
+
     // コマンドアロケータを生成
     result = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator));
     assert(SUCCEEDED(result));
@@ -261,8 +270,6 @@ void DirectXCommon::RenderTargetInitialize()
         D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = rtvHeap->GetCPUDescriptorHandleForHeapStart();
         // 裏か表かでアドレスがずれる
         rtvHandle.ptr += i * device->GetDescriptorHandleIncrementSize(rtvHeapDesc.Type);
-        // レンダーターゲットビューの設定
-        D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
         // シェーダーの計算結果をSRGBに変換して書き込む
         rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
         rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
@@ -318,38 +325,25 @@ void DirectXCommon::DepthBufferInitialize()
 
 void DirectXCommon::FenceInitialize()
 {
-    HRESULT result;
+    HRESULT result{};
 
     // フェンスの生成
+
     result = device->CreateFence(fenceVal, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
     assert(SUCCEEDED(result));
 }
 
-void DirectXCommon::InitializeFixFPS()
+ID3D12DescriptorHeap* DirectXCommon::CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT numDescripots, bool shaderVisible)
 {
-    //現在時刻を記録
-    reference_ = std::chrono::steady_clock::now();
+    ID3D12DescriptorHeap* descriptorHeap = nullptr;
+    D3D12_DESCRIPTOR_HEAP_DESC descriptorHeapDesc{};
+    descriptorHeapDesc.Type = heapType;
+    descriptorHeapDesc.NumDescriptors = numDescripots;
+    descriptorHeapDesc.Flags = shaderVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+
+    HRESULT result = device->CreateDescriptorHeap(&descriptorHeapDesc, IID_PPV_ARGS(&descriptorHeap));
+    assert(SUCCEEDED(result));
+
+    return descriptorHeap;
 }
 
-void DirectXCommon::UpdateFixFPS()
-{
-    const std::chrono::microseconds kMinTime(uint64_t(1000000.0f / 60.0f));
-
-    const std::chrono::microseconds kMinCheckTime(uint64_t(1000000.0f / 65.0f));
-
-    //現在時刻の取得
-    std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-    //前回の記録からの経過時間の取得
-    std::chrono::microseconds elapsed = std::chrono::duration_cast<std::chrono::microseconds>(now - reference_);
-
-    if (elapsed < kMinCheckTime) {
-        //1/60秒経過するまで、微小なスリープを繰り返す
-        while (std::chrono::steady_clock::now() - reference_ < kMinTime) {
-
-            std::this_thread::sleep_for(std::chrono::microseconds(1));
-        }
-    }
-
-    //現在の時間を記録
-    reference_ = std::chrono::steady_clock::now();
-}
